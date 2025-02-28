@@ -1,0 +1,231 @@
+openapi: 3.0.0
+info:
+  title: Online Bookstore API
+  description: A RESTful API for managing an online bookstore with book and author management.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Development server
+    
+paths:
+  /login:
+    get:
+      summary: Authenticates and retrieves an authorization token
+      description: Authenticates the user and returns a bearer token as a plain string.
+      responses:
+        '200':
+          description: Bearer token
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "qoihfuiqzhifqziuhgqz..."
+
+  /books:
+    get:
+      summary: List books
+      description: Retrieve a list of books or search by criteria.
+      parameters:
+        - name: title
+          in: query
+          description: Filter books by title
+          schema:
+            type: string
+        - name: author
+          in: query
+          description: Filter books by author name
+          schema:
+            type: string
+        - name: genre
+          in: query
+          description: Filter books by genre
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Book'
+    post:
+      summary: Create a book
+      description: Add a new book to the system.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Book'
+      responses:
+        '201':
+          description: Book created
+  /books/{id}:
+    get:
+      summary: Get a book
+      description: Retrieve details of a specific book by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Book details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404':
+          description: Book not found
+    put:
+      summary: Update a book
+      description: Update details of an existing book by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Book'
+      responses:
+        '200':
+          description: Book updated
+    delete:
+      summary: Delete a book
+      description: Remove a book by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Book deleted
+  /authors:
+    get:
+      summary: List authors
+      description: Retrieve a list of all authors.
+      responses:
+        '200':
+          description: List of authors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Author'
+    post:
+      summary: Create an author
+      description: Add a new author to the system.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Author'
+      responses:
+        '201':
+          description: Author created
+  /authors/{id}:
+    get:
+      summary: Get an author
+      description: Retrieve details of a specific author by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Author details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+        '404':
+          description: Author not found
+    put:
+      summary: Update an author
+      description: Update an existing author by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Author'
+      responses:
+        '200':
+          description: Author updated
+    delete:
+      summary: Delete an author
+      description: Remove an author by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Author deleted
+components:
+  schemas:
+    Book:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the book
+        title:
+          type: string
+          description: Title of the book
+        author:
+          $ref: '#/components/schemas/Author'
+        genres:
+          type: array
+          description: List of genres for the book
+          items:
+            type: string
+        published_at:
+          type: string
+          format: date-time
+          description: Publication date of the book
+        price:
+          type: number
+          format: float
+          description: Price of the book
+        stock:
+          type: integer
+          description: Number of books available in stock
+    Author:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the author
+        first_name:
+          type: string
+          description: First name of the author
+        last_name:
+          type: string
+          description: Last name of the author
+        bio:
+          type: string
+          description: Short biography of the author
