@@ -1,3 +1,11 @@
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,          -- Auto-incremented unique identifier for each user
+    useremail VARCHAR(255) UNIQUE NOT NULL,  -- Email address with unique constraint
+    password_hash TEXT NOT NULL     -- Hashed password for security
+);
+
+
 CREATE TABLE authors (
     id SERIAL PRIMARY KEY,
     first_name VARCHAR(100) NOT NULL,

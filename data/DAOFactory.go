@@ -32,6 +32,10 @@ func GetDAO[T EntityType](name string, dbTemplate *DBTemplate) (IDAO[T], error) 
 		if orderRepo, ok := any(NewOrderRepository(dbTemplate)).(IDAO[T]); ok {
 			dao = orderRepo
 		}
+	case "user":
+		if userRepo, ok := any(NewUserRepository(dbTemplate)).(IDAO[T]); ok {
+			dao = userRepo
+		}
 	default:
 		return nil, errors.New("invalid repository")
 	}

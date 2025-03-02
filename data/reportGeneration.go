@@ -94,7 +94,7 @@ func StartReportGenerator(store *DBTemplate) {
 		log.Fatalf("Failed to cast DAO to *OrderRepository")
 	}
 
-	ticker := time.NewTicker(24 * time.Second)
+	ticker := time.NewTicker(100 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {

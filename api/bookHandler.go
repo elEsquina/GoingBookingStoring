@@ -3,10 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"finalproject/caching"
 	"finalproject/data"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func getBookRepoFromFactory(w http.ResponseWriter, r *http.Request) (data.IDAO[data.Book], error) {
@@ -25,35 +28,72 @@ func getBookRepoFromFactory(w http.ResponseWriter, r *http.Request) (data.IDAO[d
 }
 
 func GetAllBooks(w http.ResponseWriter, r *http.Request) {
-	repo, err := getBookRepoFromFactory(w, r)
-	if err != nil {
-		return
-	}
-
 	title := r.URL.Query().Get("title")
 	author := r.URL.Query().Get("author")
 	genre := r.URL.Query().Get("genre")
+	key := "books:" + title + genre + author
+
+	if cachedData, exists := caching.Cache.Get(key); exists {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cachedData)
+		return
+	}
+
+	repo, err := getBookRepoFromFactory(w, r)
+	if err != nil {
+		http.Error(w, "Failed to get repository: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	var books []data.Book
-
 	if title != "" || author != "" || genre != "" {
-		searchCriteria := data.SearchCriteria{
-			Title: title,
-			AuthorName: author,
-			Genre: genre,
-		}
+		searchCriteria := data.SearchCriteria{Title: title, AuthorName: author, Genre: genre}
 		books, err = repo.(*data.BookRepository).GetBookBySearchCriteria(searchCriteria)
 	} else {
 		books, err = repo.GetAll()
 	}
 
 	if err != nil {
-		http.Error(w, "Failed to retrieve books" + err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to retrieve books: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	caching.Cache.Set(key, books, 10*time.Minute)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(books)
+}
+
+func GetBookById(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid book ID", http.StatusBadRequest)
+		return
+	}
+
+	key := fmt.Sprintf("book:%d", id)
+	if cachedData, exists := caching.Cache.Get(key); exists {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cachedData)
+		return
+	}
+
+	repo, err := getBookRepoFromFactory(w, r)
+	if err != nil {
+		return
+	}
+
+	book, err := repo.GetById(id)
+	if err != nil {
+		http.Error(w, "Book not found", http.StatusNotFound)
+		return
+	}
+
+	caching.Cache.Set(key, book, 10*time.Minute)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(book)
 }
 
 func CreateBook(w http.ResponseWriter, r *http.Request) {
@@ -70,36 +110,13 @@ func CreateBook(w http.ResponseWriter, r *http.Request) {
 
 	createdBook, err := repo.Create(book)
 	if err != nil {
-		http.Error(w, "Failed to create book" + err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to create book"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(createdBook)
-}
-
-func GetBookById(w http.ResponseWriter, r *http.Request) {
-	repo, err := getBookRepoFromFactory(w, r)
-	if err != nil {
-		return
-	}
-
-	idStr := strings.TrimPrefix(r.URL.Path, "/books/")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid book ID", http.StatusBadRequest)
-		return
-	}
-
-	book, err := repo.GetById(id)
-	if err != nil {
-		http.Error(w, "Book not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(book)
 }
 
 func UpdateBookById(w http.ResponseWriter, r *http.Request) {

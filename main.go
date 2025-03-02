@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"finalproject/api"
+	"finalproject/caching"
 	"finalproject/data"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,60 +13,75 @@ import (
 	"time"
 )
 
-/* 
-TODO: 
-	Postgres SQL: Done
-	Greaceful shutdown: Done
-	Logging: Done
-	Authentication: Done
-	Testing: Done
-	Docker Container: Not Done
-*/
-
 func main() {
-	template := data.NewDBTemplate("postgres://postgres:root@localhost:5432/finalproject?sslmode=disable")
+	template := data.NewDBTemplate("postgres://postgres:12345@localhost:5432/finalproject?sslmode=disable")
 
 	go data.StartReportGenerator(template)
 
-	http.Handle("/login", api.RequestLogger( http.HandlerFunc(api.Login) ) )
+	// Initialize in-memory rate limiter using go-cache
+	rateLimiter := caching.NewRateLimiter(1, 10, 1000*time.Second) // Adjust parameters as needed
+	fmt.Println(rateLimiter)
+
+	// Define routes with rate limiting
+	http.Handle("/login", rateLimiter.Middleware(
+		api.RequestLogger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			api.LoginUserRouter(template, w, r)
+		})),
+	))
+
+	http.Handle("/signup", rateLimiter.Middleware(
+		api.RequestLogger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			api.SignUserRouter(template, w, r)
+		})),
+	))
 
 	http.Handle("/books",
-		api.RequestLogger(
-			api.Authenticate(
-				api.ContextGeneration(template, http.HandlerFunc(api.BooksRouter)),
+		rateLimiter.Middleware(
+			api.RequestLogger(
+				api.Authenticate(
+					api.ContextGeneration(template, http.HandlerFunc(api.BooksRouter)),
+				),
 			),
 		),
 	)
 
 	http.Handle("/books/{id}",
-		api.RequestLogger(
-			api.Authenticate(
-				api.ContextGeneration(template, http.HandlerFunc(api.BooksPathParamRouter)),
+		rateLimiter.Middleware(
+			api.RequestLogger(
+				api.Authenticate(
+					api.ContextGeneration(template, http.HandlerFunc(api.BooksPathParamRouter)),
+				),
 			),
 		),
 	)
 
 	http.Handle("/authors",
-		api.RequestLogger(
-			api.Authenticate(
-				api.ContextGeneration(template, http.HandlerFunc(api.AuthorsRouter)),
+		rateLimiter.Middleware(
+			api.RequestLogger(
+				api.Authenticate(
+					api.ContextGeneration(template, http.HandlerFunc(api.AuthorsRouter)),
+				),
 			),
 		),
 	)
 
 	http.Handle("/authors/{id}",
-		api.RequestLogger(
-			api.Authenticate(
-				api.ContextGeneration(template, http.HandlerFunc(api.AuthorsPathParamRouter)),
+		rateLimiter.Middleware(
+			api.RequestLogger(
+				api.Authenticate(
+					api.ContextGeneration(template, http.HandlerFunc(api.AuthorsPathParamRouter)),
+				),
 			),
 		),
 	)
 
+	// Start the HTTP server
 	server := &http.Server{
 		Addr:    ":8080",
-		Handler: nil, 
+		Handler: nil,
 	}
 
+	// Graceful Shutdown Handling
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 

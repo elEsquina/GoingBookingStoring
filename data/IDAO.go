@@ -1,7 +1,7 @@
 package data
 
 type EntityType interface {
-	Book | Author | Customer | Order
+	Book | Author | Customer | Order | User
 }
 
 type IDAO[T EntityType] interface {
@@ -10,7 +10,6 @@ type IDAO[T EntityType] interface {
 	Update(id int, obj T) (T, error)
 	Delete(id int) error
 	GetAll() ([]T, error)
+
 	//Search(criteria SearchCriteria) ([]T, error)
 }
-
-

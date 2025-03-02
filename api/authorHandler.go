@@ -3,10 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"finalproject/caching"
 	"finalproject/data"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func getAuthorRepoFromFactory(w http.ResponseWriter, r *http.Request) (data.IDAO[data.Author], error) {
@@ -25,6 +28,14 @@ func getAuthorRepoFromFactory(w http.ResponseWriter, r *http.Request) (data.IDAO
 }
 
 func GetAllAuthors(w http.ResponseWriter, r *http.Request) {
+	const cacheKey = "authors"
+
+	if cachedData, exists := caching.Cache.Get(cacheKey); exists {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cachedData)
+		return
+	}
+
 	repo, err := getAuthorRepoFromFactory(w, r)
 	if err != nil {
 		return
@@ -35,6 +46,8 @@ func GetAllAuthors(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to retrieve authors", http.StatusInternalServerError)
 		return
 	}
+
+	caching.Cache.Set(cacheKey, authors, 10*time.Minute)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(authors)
@@ -58,6 +71,8 @@ func CreateAuthor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	caching.Cache.Delete("authors")
+
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(createdAuthor)
@@ -76,11 +91,21 @@ func GetAuthorById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cacheKey := "author:" + idStr
+	if cachedData, exists := caching.Cache.Get(cacheKey); exists {
+		fmt.Println(cachedData)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cachedData)
+		return
+	}
+
 	author, err := repo.GetById(id)
 	if err != nil {
 		http.Error(w, "Author not found", http.StatusNotFound)
 		return
 	}
+
+	caching.Cache.Set(cacheKey, author, 10*time.Minute)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(author)
@@ -111,6 +136,10 @@ func UpdateAuthorById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cacheKey := "author:" + idStr
+	caching.Cache.Delete(cacheKey)
+	caching.Cache.Delete("authors")
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(author)
 }
@@ -132,6 +161,10 @@ func DeleteAuthorById(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete author", http.StatusInternalServerError)
 		return
 	}
+
+	cacheKey := "author:" + idStr
+	caching.Cache.Delete(cacheKey)
+	caching.Cache.Delete("authors")
 
 	w.WriteHeader(http.StatusNoContent)
 }

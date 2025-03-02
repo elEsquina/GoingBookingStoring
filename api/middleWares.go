@@ -6,15 +6,20 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-var tokenStore []string
+type Key struct {
+	UserID int
+}
 
-func BooksRouter(w http.ResponseWriter, r *http.Request){
+var tokenStore = make(map[Key]uuid.UUID)
+
+func BooksRouter(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		GetAllBooks(w, r)
 	} else if r.Method == http.MethodPost {
@@ -23,9 +28,21 @@ func BooksRouter(w http.ResponseWriter, r *http.Request){
 		http.Error(w, "Invalid request method", http.StatusBadRequest)
 	}
 }
-
-
-func BooksPathParamRouter(w http.ResponseWriter, r *http.Request){
+func LoginUserRouter(db *data.DBTemplate, w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		Login(db, w, r)
+	} else {
+		http.Error(w, "Invalid request method", http.StatusBadRequest)
+	}
+}
+func SignUserRouter(db *data.DBTemplate, w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		SignUp(db, w, r)
+	} else {
+		http.Error(w, "Invalid request method", http.StatusBadRequest)
+	}
+}
+func BooksPathParamRouter(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		GetBookById(w, r)
 	} else if r.Method == http.MethodPut {
@@ -37,8 +54,7 @@ func BooksPathParamRouter(w http.ResponseWriter, r *http.Request){
 	}
 }
 
-
-func AuthorsRouter(w http.ResponseWriter, r *http.Request){
+func AuthorsRouter(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		GetAllAuthors(w, r)
 	} else if r.Method == http.MethodPost {
@@ -48,8 +64,7 @@ func AuthorsRouter(w http.ResponseWriter, r *http.Request){
 	}
 }
 
-
-func AuthorsPathParamRouter(w http.ResponseWriter, r *http.Request){
+func AuthorsPathParamRouter(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		GetAuthorById(w, r)
 	} else if r.Method == http.MethodPut {
@@ -61,14 +76,32 @@ func AuthorsPathParamRouter(w http.ResponseWriter, r *http.Request){
 	}
 }
 
-
-func Login(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	newUUID, _ := uuid.NewUUID()
-	tokenStore = append(tokenStore, newUUID.String())
-	w.Write([]byte(newUUID.String()))
+func validateEmail(email string) bool {
+	// Define the regex pattern for validating email format
+	const emailRegex = `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	re := regexp.MustCompile(emailRegex)
+	return re.MatchString(email)
 }
 
+func validatePassword(password string) bool {
+	if len(password) < 8 {
+		return false
+	}
+
+	if !strings.ContainsAny(password, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+		return false
+	}
+
+	if !strings.ContainsAny(password, "0123456789") {
+		return false
+	}
+
+	if !strings.ContainsAny(password, "!@#$%^&*()_+{}[]|:;<>,.?/") {
+		return false
+	}
+
+	return true
+}
 
 func Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,10 +111,10 @@ func Authenticate(next http.Handler) http.Handler {
 		}
 
 		token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", -1)
-		exists := false 
+		exists := false
 
 		for _, t := range tokenStore {
-			if t == token {
+			if t.String() == token {
 				exists = true
 				break
 			}
@@ -107,8 +140,8 @@ func RequestLogger(next http.Handler) http.Handler {
 		logger := log.New(file, "", log.LstdFlags)
 		lrw := NewLoggingResponseWriter(w)
 		next.ServeHTTP(lrw, r)
-        statusCode := lrw.statusCode
-		logger.Printf("%s - %s %s %s\n", time.Now().Format(time.RFC3339), r.Method, r.URL.Path, http.StatusText(statusCode) )
+		statusCode := lrw.statusCode
+		logger.Printf("%s - %s %s %s\n", time.Now().Format(time.RFC3339), r.Method, r.URL.Path, http.StatusText(statusCode))
 	})
 }
 
@@ -122,18 +155,17 @@ func ContextGeneration(store *data.DBTemplate, next http.Handler) http.Handler {
 	})
 }
 
-
 // loggingResponseWriter is a wrapper around an http.ResponseWriter that keeps track of the status code written to it.
 type loggingResponseWriter struct {
-    http.ResponseWriter
-    statusCode int
+	http.ResponseWriter
+	statusCode int
 }
 
 func NewLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
-    return &loggingResponseWriter{w, http.StatusOK}
+	return &loggingResponseWriter{w, http.StatusOK}
 }
 
 func (lrw *loggingResponseWriter) WriteHeader(code int) {
-    lrw.statusCode = code
-    lrw.ResponseWriter.WriteHeader(code)
+	lrw.statusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
 }

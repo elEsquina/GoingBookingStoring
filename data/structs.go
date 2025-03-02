@@ -11,12 +11,11 @@ type Author struct {
 	Bio       string `json:"bio" db:"bio"`
 }
 
-
 type Book struct {
 	ID          int       `json:"id" db:"id"`
 	Title       string    `json:"title" db:"title"`
 	Author      Author    `json:"author" db:"author"`
-	TextGenres  string    `json:"-" db:"genres"` 
+	TextGenres  string    `json:"-" db:"genres"`
 	PublishedAt time.Time `json:"published_at" db:"published_at"`
 	Price       float64   `json:"price" db:"price"`
 	Stock       int       `json:"stock" db:"stock"`
@@ -32,11 +31,15 @@ type Address struct {
 }
 
 type OrderItem struct {
-	ID       int   `json:"id" db:"id"`
-	Book     Book  `json:"book" db:"book"`
-	Quantity int   `json:"quantity" db:"quantity"`
+	ID       int  `json:"id" db:"id"`
+	Book     Book `json:"book" db:"book"`
+	Quantity int  `json:"quantity" db:"quantity"`
 }
-
+type User struct {
+	ID           int
+	Email        string
+	PasswordHash string
+}
 type Order struct {
 	ID         int         `json:"id" db:"id"`
 	Customer   Customer    `json:"customer" db:"customer"`
@@ -71,7 +74,7 @@ type ErrorResponse struct {
 }
 
 type SearchCriteria struct {
-	Title  string `json:"title"`
+	Title      string `json:"title"`
 	AuthorName string `json:"author_name"`
-	Genre  string `json:"genre"`
+	Genre      string `json:"genre"`
 }

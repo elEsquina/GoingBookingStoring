@@ -1,9 +1,9 @@
 package data
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
-	"database/sql"
 )
 
 type BookRepository struct {
@@ -88,7 +88,6 @@ func (repo *BookRepository) GetAll() ([]Book, error) {
 	return books, nil
 }
 
-
 func (repo *BookRepository) GetBookBySearchCriteria(s SearchCriteria) ([]Book, error) {
 	query := `
 		SELECT b.id AS id, b.title, b.genres, b.published_at, b.price, b.stock,
@@ -103,9 +102,8 @@ func (repo *BookRepository) GetBookBySearchCriteria(s SearchCriteria) ([]Book, e
 
 	books, err := QueryStructs[Book](repo.dbTemplate, query,
 		s.Title,
-		s.AuthorName, 
-		"%" + s.Genre + "%") 
-
+		s.AuthorName,
+		"%"+s.Genre+"%")
 
 	if err != nil {
 		return nil, err
