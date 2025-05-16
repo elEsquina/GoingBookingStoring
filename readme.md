@@ -11,6 +11,9 @@ This project implements a RESTful API for an online bookstore that allows users 
 - **Authentication**:
 
   - Authentication with the use of UUID Bearer tokens.
+  - User login and signup functionality with secure password hashing.
+  - Email validation with regex pattern enforcement.
+  - Password strength requirements (minimum 8 characters, uppercase letter, number, and special character).
 
 - **Book Management**:
 
@@ -29,8 +32,14 @@ This project implements a RESTful API for an online bookstore that allows users 
 ### Middlewares and Security
 
 - **Authentication**:
-    - Token-based authentication for securing endpoints.
-    - Make a `GET` request to `http://baseurl:8080/login` to obtain a Bearer token, which can be then attached to the `Authorization` header in any future request.
+    - Token-based authentication for securing endpoints using UUID Bearer tokens.
+    - Make a `POST` request to `http://baseurl:8080/login` with valid email and password to obtain a Bearer token, which can be then attached to the `Authorization` header in any future request.
+    - Password requirements: minimum 8 characters, at least one uppercase letter, one number, and one special character.
+    
+- **Caching and Rate Limiting**:
+    - In-memory caching using `github.com/patrickmn/go-cache` with 10-minute expiration.
+    - IP-based rate limiting to prevent abuse of API endpoints.
+    - Configurable burst limits and automatic expiry of rate limit counters.
 - **Request Logging**:
     - Logs all requests, including timestamps, methods, and response statuses, to `requests.log`.
 - **Context Middleware**:
@@ -59,21 +68,38 @@ Waits for ongoing requests to complete within a defined timeout period (5 second
 ```
 .
 ├── api                     # API handlers and routing
+│   ├── authHandler.go      # Authentication handlers for login and signup
 │   ├── authorHandler.go    # Handlers for author-related operations
 │   ├── bookHandler.go      # Handlers for book-related operations
 │   ├── middleWares.go      # Middleware for logging and authentication
+├── caching                 # Caching and rate limiting implementation
+│   ├── cache.go            # In-memory caching and rate limiting logic
 ├── configs                 # Configuration files
 ├── data                    # Database and data access logic
+│   ├── authorDAO.go        # Author data access object implementation
+│   ├── bookDAO.go          # Book data access object implementation
+│   ├── customerDAO.go      # Customer data access object implementation
 │   ├── dbTemplate.go       # Database interaction template
-│   ├── reportGeneration.go # Logic for generating sales reports
 │   ├── DAOFactory.go       # Ensures the existence of one single instance of each repository
 │   ├── IDAO.go             # Abstract generic DAO interface
+│   ├── orderDAO.go         # Order data access object implementation
+│   ├── reportGeneration.go # Logic for generating sales reports
 │   ├── structs.go          # Entities layer
-│   ├── *DAO.go             # Concrete repositories
+│   ├── userDAO.go          # User data access object for authentication
 ├── docs                    # Documentation
+│   ├── apidocs.yaml        # API documentation in YAML format
 ├── output-reports          # Directory for saved sales reports
 ├── sql                     # SQL scripts for schema and migrations
+│   ├── database-dummyloader.sql # SQL for loading dummy data
+│   ├── DDL.sql             # Database definition language scripts
 ├── tests                   # Tests
+│   ├── dummydata           # Scripts for generating test data
+│   │   ├── datapopulation.ipynb # Jupyter notebook for data generation
+│   │   ├── csv             # CSV files with test data
+│   ├── stresstest          # Load testing scripts
+│       ├── stress.py       # Python script for stress testing endpoints
+├── go.mod                  # Go module definition
+├── go.sum                  # Go module checksums
 ├── main.go                 # Entry point of the application
 ├── requests.log            # Log file for HTTP requests
 ```
@@ -88,11 +114,12 @@ Waits for ongoing requests to complete within a defined timeout period (5 second
 http://localhost:8080
 ```
 
-### Login 
+### Login and Authentication
 
 | Endpoint      | Method | Description                                                                  |
 | ------------- | ------ | ---------------------------------------------------------------------------- |
-| `/login`      | Any    | Returns an authorization token to use as header to access server ressources  |
+| `/login`      | POST   | Authenticates user with email/password and returns a UUID Bearer token       |
+| `/signup`     | POST   | Creates a new user account with email/password and returns a token           |
 
 ### Books
 
@@ -178,6 +205,58 @@ http://localhost:8080
 - **Error Logs**:
   - Errors during report generation or database operations are logged to the console.
 
+
+## Authentication System
+
+### Login Process
+
+1. Users send a POST request to `/login` with email and password in JSON format:
+   ```json
+   {
+     "email": "user@example.com",
+     "password": "SecureP@ss123"
+   }
+   ```
+
+2. The server validates:
+   - Email format using regex pattern
+   - Password strength (minimum 8 characters, at least one uppercase letter, one number, one special character)
+
+3. If credentials are valid, the server:
+   - Returns a UUID Bearer token
+   - Stores the token mapped to the user ID in an in-memory store
+
+4. For subsequent API requests, the client must include the token in the Authorization header:
+   ```
+   Authorization: Bearer [token]
+   ```
+
+5. New users can register via the `/signup` endpoint with the same JSON format.
+
+### Authentication Flow
+
+- The `Authenticate` middleware intercepts all protected requests
+- Extracts the Bearer token from the Authorization header
+- Validates the token against the in-memory token store
+- Rejects unauthorized requests with a 401 status code
+- Allows authorized requests to proceed to the handler
+
+## Caching System
+
+The application implements an in-memory caching system with the following features:
+
+### Rate Limiting
+- Limits the number of requests from a single IP address
+- Uses an in-memory cache (go-cache) to track request counts
+- Configurable rate and burst limits 
+- Automatically expires entries after a configured TTL (Time-To-Live)
+- Returns HTTP 429 (Too Many Requests) status when limits are exceeded
+
+### Cache Implementation
+- Uses `github.com/patrickmn/go-cache` for in-memory caching
+- Default cache expiration of 10 minutes
+- Improves performance by reducing database load for frequently accessed data
+- Centralized cache instance shared across application components
 
 ## Testing
 
